@@ -43,6 +43,6 @@ jobs:
         shell: pwsh
         run: |
           $artifactName = "${{ github.event.inputs.artifact_name }}"
-          $destination = "\\MSI\Github_destination"
+          $destination = "\\192.168.0.135\Github_destination"
           Write-Host "Copying $artifactName to $destination"
           Copy-Item -Path "$artifactName" -Destination "$destination" -Force
