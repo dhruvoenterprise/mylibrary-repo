@@ -36,6 +36,9 @@ jobs:
         Compress-Archive -Path output/* -DestinationPath $version
         "ZIP_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+    - name: List ZIP files before upload
+      run: dir *.zip
+
     - name: Upload ZIP to JFrog
       shell: pwsh
       run: |
@@ -45,7 +48,8 @@ jobs:
         Write-Host "Uploading $zipName to $uploadUrl"
 
         if (Test-Path $zipName) {
-          curl -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
+          Write-Host "File found. Size: $(Get-Item $zipName).Length bytes"
+          curl --fail --show-error --verbose -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
         } else {
           Write-Error "File $zipName not found. Upload skipped."
           exit 1
