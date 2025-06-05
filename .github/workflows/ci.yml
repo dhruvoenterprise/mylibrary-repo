@@ -1,0 +1,40 @@
+name: Build and Upload to JFrog
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      JFROG_USER: ${{ secrets.JFROG_USER }}
+      JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+      JFROG_URL: ${{ secrets.JFROG_URL }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '7.x'
+
+    - name: Restore dependencies
+      run: dotnet restore
+
+    - name: Build and publish DLLs
+      run: dotnet publish -c Release -o output
+
+    - name: Zip DLLs
+      run: |
+        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $shortSha = "${{ github.sha }}"[0..6] -join ''
+        $version = "app_package_${timestamp}_$shortSha.zip"
+        Compress-Archive -Path output\* -DestinationPath $version
+        echo "ZIP_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+    - name: Upload ZIP to JFrog
+      run: |
+        curl -u $env:JFROG_USER:$env:JFROG_PASSWORD -T "$env:ZIP_NAME" "$env:JFROG_URL/myrepo/$env:ZIP_NAME"
