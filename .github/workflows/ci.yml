@@ -39,6 +39,28 @@ jobs:
     - name: List ZIP files before upload
       run: dir *.zip
 
+    - name: Verify JFrog connection
+      shell: pwsh
+      run: |
+        $url = "$env:JFROG_URL"
+        Write-Host "Checking connectivity to JFrog repo: $url"
+
+        try {
+          $authHeader = "Basic " + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$env:JFROG_USER`:$env:JFROG_PASSWORD"))
+          $response = Invoke-WebRequest -Uri $url -Headers @{ Authorization = $authHeader } -Method Head -TimeoutSec 10
+
+          if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 401) {
+            Write-Host "JFrog repo reachable. Status code: $($response.StatusCode)"
+          } else {
+            Write-Error "Unexpected status code: $($response.StatusCode)"
+            exit 1
+          }
+        }
+        catch {
+          Write-Error "Failed to connect to JFrog repo: $_"
+          exit 1
+        }
+
     - name: Upload ZIP to JFrog
       shell: pwsh
       run: |
@@ -48,8 +70,9 @@ jobs:
         Write-Host "Uploading $zipName to $uploadUrl"
 
         if (Test-Path $zipName) {
-          Write-Host "File found. Size: $(Get-Item $zipName).Length bytes"
-          curl --fail --show-error --verbose -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
+          $fileSize = (Get-Item $zipName).Length
+          Write-Host "File found. Size: $fileSize bytes"
+          curl --fail --show-error --verbose --progress-bar -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
         } else {
           Write-Error "File $zipName not found. Upload skipped."
           exit 1
