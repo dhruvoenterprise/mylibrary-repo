@@ -22,19 +22,24 @@ jobs:
         dotnet-version: '7.x'
 
     - name: Restore dependencies
-      run: dotnet restore
+      run: dotnet restore ./MyLibrary/MyLibrary.csproj
 
     - name: Build and publish DLLs
-      run: dotnet publish -c Release -o output
+      run: dotnet publish ./MyLibrary/MyLibrary.csproj -c Release -o output
 
     - name: Zip DLLs
+      shell: pwsh
       run: |
         $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
         $shortSha = "${{ github.sha }}"[0..6] -join ''
         $version = "app_package_${timestamp}_$shortSha.zip"
-        Compress-Archive -Path output\* -DestinationPath $version
-        echo "ZIP_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+        Compress-Archive -Path output/* -DestinationPath $version
+        "ZIP_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
     - name: Upload ZIP to JFrog
+      shell: pwsh
       run: |
-        curl -u $env:JFROG_USER:$env:JFROG_PASSWORD -T "$env:ZIP_NAME" "$env:JFROG_URL/myrepo/$env:ZIP_NAME"
+        $zipName = $env:ZIP_NAME
+        $url = "$env:JFROG_URL/myrepo/$zipName"
+        Write-Host "Uploading $zipName to $url"
+        curl -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$url"
