@@ -1,4 +1,4 @@
-name: Build and Upload to JFrog1
+name: Build and Upload to JFrog
 
 on:
   push:
@@ -27,12 +27,12 @@ jobs:
     - name: Build and publish DLLs
       run: dotnet publish ./MyLibrary/MyLibrary.csproj -c Release -o output
 
-    - name: Zip DLLs
+    - name: Zip DLLs with version
       shell: pwsh
       run: |
-        $timestamp = Get-Date -Format "yyyyMMdd_HHmmss"
+        $runNumber = $env:GITHUB_RUN_NUMBER
         $shortSha = "${{ github.sha }}"[0..6] -join ''
-        $version = "app_package_${timestamp}_$shortSha.zip"
+        $version = "app_package_build${runNumber}_$shortSha.zip"
         Compress-Archive -Path output/* -DestinationPath $version
         "ZIP_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
 
@@ -40,6 +40,13 @@ jobs:
       shell: pwsh
       run: |
         $zipName = $env:ZIP_NAME
-        $url = "$env:JFROG_URL/myrepo/$zipName"
-        Write-Host "Uploading $zipName to $url"
-        curl -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$url"
+        $uploadUrl = "$env:JFROG_URL/$zipName"
+
+        Write-Host "Uploading $zipName to $uploadUrl"
+
+        if (Test-Path $zipName) {
+          curl -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
+        } else {
+          Write-Error "File $zipName not found. Upload skipped."
+          exit 1
+        }
