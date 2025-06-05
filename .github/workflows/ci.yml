@@ -10,7 +10,7 @@ jobs:
     env:
       JFROG_USER: ${{ secrets.JFROG_USER }}
       JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-      JFROG_URL: https://trial9xcizh.jfrog.io/artifactory
+      JFROG_URL: https://trial9xcizh.jfrog.io
       JFROG_REPO: myrepo-generic-local
 
     steps:
@@ -47,7 +47,7 @@ jobs:
         shell: pwsh
         run: |
           jfrog config add ci-server `
-            --url "$env:JFROG_URL" `
+            --url "$env:JFROG_URL/artifactory" `
             --user "$env:JFROG_USER" `
             --password "$env:JFROG_PASSWORD" `
             --interactive=false
@@ -58,7 +58,7 @@ jobs:
           $zipName = $env:ZIP_NAME
           if (Test-Path $zipName) {
             Write-Host "Uploading $zipName to $env:JFROG_REPO"
-            jfrog rt u $zipName "$env:JFROG_REPO/"
+            jfrog rt u "$zipName" "$env:JFROG_REPO/"
           } else {
             Write-Error "ZIP file not found."
             exit 1
