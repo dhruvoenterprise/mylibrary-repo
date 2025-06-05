@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       artifact_name:
-        description: 'Enter artifact name (e.g., app_package_20250530_1234_abc123.zip)'
+        description: 'app_package_build14_facd1a8.zip'
         required: true
 
 jobs:
@@ -13,16 +13,36 @@ jobs:
     env:
       JFROG_USER: ${{ secrets.JFROG_USER }}
       JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-      JFROG_URL: ${{ secrets.JFROG_URL }}
+      JFROG_URL: https://trial9xcizh.jfrog.io
+      JFROG_REPO: myrepo-generic-local
 
     steps:
+      - name: Install JFrog CLI
+        run: choco install jfrog-cli -y
+
+      - name: Configure JFrog CLI
+        shell: pwsh
+        run: |
+          jfrog config add cd-server `
+            --url "$env:JFROG_URL" `
+            --user "$env:JFROG_USER" `
+            --password "$env:JFROG_PASSWORD" `
+            --interactive=false
+
       - name: Download artifact from JFrog
+        shell: pwsh
         run: |
           $artifactName = "${{ github.event.inputs.artifact_name }}"
-          curl -u $env:JFROG_USER:$env:JFROG_PASSWORD -o $artifactName "$env:JFROG_URL/myrepo/$artifactName"
+          jfrog rt download "$env:JFROG_REPO/$artifactName" "$artifactName"
+          if (!(Test-Path "$artifactName")) {
+            Write-Error "Artifact $artifactName not found after download"
+            exit 1
+          }
 
       - name: Copy to Shared Folder
+        shell: pwsh
         run: |
           $artifactName = "${{ github.event.inputs.artifact_name }}"
-          $destination = "\\\\TargetServer\\DeployFolder"
-          Copy-Item -Path $artifactName -Destination $destination -Force
+          $destination = "\\MSI\Github_destination"
+          Write-Host "Copying $artifactName to $destination"
+          Copy-Item -Path "$artifactName" -Destination "$destination" -Force
