@@ -43,11 +43,11 @@ jobs:
       - name: Install JFrog CLI
         run: choco install jfrog-cli -y
 
-      - name: Configure JFrog CLI
+      - name: Configure JFrog CLI (Cloud)
         shell: pwsh
         run: |
           jfrog config add ci-server `
-            --url "$env:JFROG_URL/artifactory" `
+            --url "$env:JFROG_URL" `
             --user "$env:JFROG_USER" `
             --password "$env:JFROG_PASSWORD" `
             --interactive=false
@@ -58,7 +58,7 @@ jobs:
           $zipName = $env:ZIP_NAME
           if (Test-Path $zipName) {
             Write-Host "Uploading $zipName to $env:JFROG_REPO"
-            jfrog rt u "$zipName" "$env:JFROG_REPO/"
+            jfrog rt upload "$zipName" "$env:JFROG_REPO/"
           } else {
             Write-Error "ZIP file not found."
             exit 1
