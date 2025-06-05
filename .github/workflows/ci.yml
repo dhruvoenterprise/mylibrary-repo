@@ -10,7 +10,8 @@ jobs:
     env:
       JFROG_USER: ${{ secrets.JFROG_USER }}
       JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-      JFROG_URL: ${{ secrets.JFROG_URL }}
+      JFROG_URL: https://trial9xcizh.jfrog.io/artifactory  # Base URL only
+      JFROG_REPO: myrepo-generic-local
 
     steps:
       - name: Checkout code
@@ -63,13 +64,13 @@ jobs:
         shell: pwsh
         run: |
           $zipName = $env:ZIP_NAME
-          $uploadUrl = "$env:JFROG_URL/$zipName"
+          $uploadUrl = "$env:JFROG_URL/$env:JFROG_REPO/$zipName"
           Write-Host "Uploading $zipName to $uploadUrl"
 
           if (Test-Path $zipName) {
             $fileSize = (Get-Item $zipName).Length
             Write-Host "File found. Size: $fileSize bytes"
-            curl.exe --fail --show-error --verbose --progress-bar -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
+            curl.exe --fail --show-error --progress-bar -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
           } else {
             Write-Error "File $zipName not found. Upload skipped."
             exit 1
