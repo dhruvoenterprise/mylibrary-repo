@@ -10,7 +10,8 @@ jobs:
     env:
       JFROG_USER: ${{ secrets.JFROG_USER }}
       JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-      JFROG_URL: ${{ secrets.JFROG_URL }}
+      JFROG_URL: ${{ secrets.JFROG_URL }}  # Should be: https://trial9xcizh.jfrog.io/artifactory
+      JFROG_REPO: myrepo-generic-local      # Your repo name
 
     steps:
     - name: Checkout code
@@ -42,15 +43,15 @@ jobs:
     - name: Verify JFrog connection
       shell: pwsh
       run: |
-        $url = "$env:JFROG_URL"
+        $url = "$env:JFROG_URL/api/repositories/$env:JFROG_REPO"
         Write-Host "Checking connectivity to JFrog repo: $url"
 
         try {
           $authHeader = "Basic " + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$env:JFROG_USER`:$env:JFROG_PASSWORD"))
-          $response = Invoke-WebRequest -Uri $url -Headers @{ Authorization = $authHeader } -Method Head -TimeoutSec 10
+          $response = Invoke-WebRequest -Uri $url -Headers @{ Authorization = $authHeader } -Method Get -TimeoutSec 10
 
-          if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 401) {
-            Write-Host "JFrog repo reachable. Status code: $($response.StatusCode)"
+          if ($response.StatusCode -eq 200) {
+            Write-Host "JFrog repo is reachable."
           } else {
             Write-Error "Unexpected status code: $($response.StatusCode)"
             exit 1
@@ -61,11 +62,11 @@ jobs:
           exit 1
         }
 
-    - name: Upload ZIP to JFrog Finally1
+    - name: Upload ZIP to JFrog
       shell: pwsh
       run: |
         $zipName = $env:ZIP_NAME
-        $uploadUrl = "$env:JFROG_URL/$zipName"
+        $uploadUrl = "$env:JFROG_URL/$env:JFROG_REPO/$zipName"
 
         Write-Host "Uploading $zipName to $uploadUrl"
 
@@ -74,6 +75,6 @@ jobs:
           Write-Host "File found. Size: $fileSize bytes"
           curl --fail --show-error --verbose --progress-bar -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
         } else {
-          Write-Error "File $zipName not found. Upload skipped."
+          Write-Host "File $zipName not found. Upload skipped."
           exit 1
         }
