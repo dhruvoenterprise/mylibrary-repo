@@ -61,7 +61,7 @@ jobs:
           exit 1
         }
 
-    - name: Upload ZIP to JFrog Finally
+    - name: Upload ZIP to JFrog Finally1
       shell: pwsh
       run: |
         $zipName = $env:ZIP_NAME
