@@ -1,0 +1,77 @@
+name: Build and Upload to JFrog
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      JFROG_USER: ${{ secrets.JFROG_USER }}
+      JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+      JFROG_URL: https://trial9xcizh.jfrog.io/artifactory  # Base URL only
+      JFROG_REPO: myrepo-generic-local
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '7.x'
+
+      - name: Restore dependencies
+        run: dotnet restore ./MyLibrary/MyLibrary.csproj
+
+      - name: Build and publish DLLs
+        run: dotnet publish ./MyLibrary/MyLibrary.csproj -c Release -o output
+
+      - name: Zip DLLs with version
+        shell: pwsh
+        run: |
+          $runNumber = $env:GITHUB_RUN_NUMBER
+          $shortSha = "${{ github.sha }}"[0..6] -join ''
+          $version = "app_package_build${runNumber}_$shortSha.zip"
+          Compress-Archive -Path output/* -DestinationPath $version
+          "ZIP_NAME=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: List ZIP files before upload
+        run: dir *.zip
+
+      - name: Verify JFrog connection
+        shell: pwsh
+        run: |
+          $url = "$env:JFROG_URL/api/repositories/$env:JFROG_REPO"
+          Write-Host "Checking connectivity to JFrog repo: $url"
+          try {
+            $authHeader = "Basic " + [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$env:JFROG_USER`:$env:JFROG_PASSWORD"))
+            $response = Invoke-WebRequest -Uri $url -Headers @{ Authorization = $authHeader } -Method Get -TimeoutSec 10
+            if ($response.StatusCode -eq 200) {
+              Write-Host "JFrog repo is reachable."
+            } else {
+              Write-Error "Unexpected status code: $($response.StatusCode)"
+              exit 1
+            }
+          }
+          catch {
+            Write-Error "Failed to connect to JFrog repo: $_"
+            exit 1
+          }
+
+      - name: Upload ZIP to JFrog
+        shell: pwsh
+        run: |
+          $zipName = $env:ZIP_NAME
+          $uploadUrl = "$env:JFROG_URL/$env:JFROG_REPO/$zipName"
+          Write-Host "Uploading $zipName to $uploadUrl"
+
+          if (Test-Path $zipName) {
+            $fileSize = (Get-Item $zipName).Length
+            Write-Host "File found. Size: $fileSize bytes"
+            curl.exe --fail --show-error --progress-bar -u "$env:JFROG_USER:$env:JFROG_PASSWORD" -T "$zipName" "$uploadUrl"
+          } else {
+            Write-Error "File $zipName not found. Upload skipped."
+            exit 1
+          }
