@@ -1,4 +1,4 @@
-name: Build and Upload to JFrog
+name: Build and Upload to JFrog1
 
 on:
   push:
