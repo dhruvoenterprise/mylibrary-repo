@@ -39,10 +39,28 @@ jobs:
             exit 1
           }
 
-      - name: Copy to Shared Folder
+      - name: Mount File Share and Copy Artifact
         shell: pwsh
+        env:
+          SHARE_USER: ${{ secrets.SHARE_USER }}         # e.g., domain\username
+          SHARE_PASS: ${{ secrets.SHARE_PASS }}         # Password for the user
+          SHARE_DESTINATION: ${{ secrets.SHARE_DESTINATION }} # UNC path like \\192.168.0.135\Github_destination
         run: |
           $artifactName = "${{ github.event.inputs.artifact_name }}"
-          $destination = "\\192.168.0.135\Github_destination"
-          Write-Host "Copying $artifactName to $destination"
-          Copy-Item -Path "$artifactName" -Destination "$destination" -Force
+          $networkPath = "$env:SHARE_DESTINATION"
+          $user = "$env:SHARE_USER"
+          $pass = "$env:SHARE_PASS"
+
+          Write-Host "Connecting to network share..."
+          net use Z: "$networkPath" /user:$user $pass
+
+          if (!(Test-Path "Z:\")) {
+            Write-Error "Failed to connect to network share at $networkPath"
+            exit 1
+          }
+
+          Write-Host "Copying $artifactName to $networkPath"
+          Copy-Item -Path "$artifactName" -Destination "Z:\" -Force
+
+          Write-Host "Disconnecting network share..."
+          net use Z: /delete
