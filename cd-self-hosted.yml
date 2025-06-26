@@ -1,0 +1,62 @@
+name: Download from JFrog and Deploy to Shared Folder
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Artifact file name (e.g., app_package_build14_facd1a8.zip)'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, linux]
+    env:
+      JFROG_USER: ${{ secrets.JFROG_USER }}
+      JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+      JFROG_URL: https://trial9xcizh.jfrog.io
+      JFROG_REPO: myrepo-generic-local
+      SHARE_USER: ${{ secrets.SHARE_USER }}                  # e.g., WORKGROUP\\user
+      SHARE_PASS: ${{ secrets.SHARE_PASS }}                  # Password
+      SHARE_DESTINATION: ${{ secrets.SHARE_DESTINATION }}    # e.g., //192.168.0.135/Github_destination
+
+    steps:
+      - name: Create working directory
+        run: mkdir -p artifact-download
+
+      - name: Configure JFrog CLI
+        run: |
+          jfrog config add cd-server \
+            --url "$JFROG_URL" \
+            --user "$JFROG_USER" \
+            --password "$JFROG_PASSWORD" \
+            --interactive=false
+
+      - name: Download artifact from JFrog
+        run: |
+          cd artifact-download
+          artifact_name="${{ github.event.inputs.artifact_name }}"
+          jfrog rt download "$JFROG_REPO/$artifact_name" "$artifact_name"
+
+          if [ ! -f "$artifact_name" ]; then
+            echo "Artifact $artifact_name not found after download"
+            exit 1
+          fi
+
+      - name: Install cifs-utils if needed
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cifs-utils
+
+      - name: Mount File Share and Copy Artifact
+        run: |
+          sudo mkdir -p /mnt/deploy_share
+
+          echo "Mounting network share..."
+          sudo mount -t cifs "$SHARE_DESTINATION" /mnt/deploy_share \
+            -o username=$SHARE_USER,password=$SHARE_PASS,uid=$(id -u),gid=$(id -g),rw
+
+          echo "Copying artifact to shared folder..."
+          cp artifact-download/${{ github.event.inputs.artifact_name }} /mnt/deploy_share/
+
+          echo "Unmounting network share..."
+          sudo umount /mnt/deploy_share

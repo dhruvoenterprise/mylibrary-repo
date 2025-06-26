@@ -1,28 +1,22 @@
-name: Download from JFrog and Deploy to Shared Folder
+name: CD using reusable action
 
 on:
   workflow_dispatch:
     inputs:
       artifact_name:
-        description: 'Enter artifact name (e.g., app_package_20250530_1234_abc123.zip)'
+        description: 'Artifact file name (e.g., app_package_build14.zip)'
         required: true
 
 jobs:
   deploy:
-    runs-on: windows-latest
-    env:
-      JFROG_USER: ${{ secrets.JFROG_USER }}
-      JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
-      JFROG_URL: ${{ secrets.JFROG_URL }}
-
-    steps:
-      - name: Download artifact from JFrog
-        run: |
-          $artifactName = "${{ github.event.inputs.artifact_name }}"
-          curl -u $env:JFROG_USER:$env:JFROG_PASSWORD -o $artifactName "$env:JFROG_URL/myrepo/$artifactName"
-
-      - name: Copy to Shared Folder
-        run: |
-          $artifactName = "${{ github.event.inputs.artifact_name }}"
-          $destination = "\\\\TargetServer\\DeployFolder"
-          Copy-Item -Path $artifactName -Destination $destination -Force
+    uses: princegupta338/common-cd-actions/.github/workflows/reusable-cd.yml@main
+    with:
+      artifact_name: ${{ inputs.artifact_name }}
+      artifactory_path: 'my-repo-local/my-app'         # Adjust per project
+      share_path: ${{ secrets.SHARE_PATH }}
+      share_user: ${{ secrets.SHARE_USER }}
+      share_password: ${{ secrets.SHARE_PASSWORD }}
+    secrets:
+      jfrog_user: ${{ secrets.JFROG_USER }}
+      jfrog_password: ${{ secrets.JFROG_PASSWORD }}
+      jfrog_url: ${{ secrets.JFROG_URL }}

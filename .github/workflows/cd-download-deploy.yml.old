@@ -1,0 +1,66 @@
+name: Download from JFrog and Deploy to Shared Folder
+
+on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Artifact file name (e.g., app_package_build14_facd1a8.zip)'
+        required: true
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    env:
+      JFROG_USER: ${{ secrets.JFROG_USER }}
+      JFROG_PASSWORD: ${{ secrets.JFROG_PASSWORD }}
+      JFROG_URL: https://trial9xcizh.jfrog.io
+      JFROG_REPO: myrepo-generic-local
+
+    steps:
+      - name: Install JFrog CLI
+        run: choco install jfrog-cli -y
+
+      - name: Configure JFrog CLI
+        shell: pwsh
+        run: |
+          jfrog config add cd-server `
+            --url "$env:JFROG_URL" `
+            --user "$env:JFROG_USER" `
+            --password "$env:JFROG_PASSWORD" `
+            --interactive=false
+
+      - name: Download artifact from JFrog
+        shell: pwsh
+        run: |
+          $artifactName = "${{ github.event.inputs.artifact_name }}"
+          jfrog rt download "$env:JFROG_REPO/$artifactName" "$artifactName"
+          if (!(Test-Path "$artifactName")) {
+            Write-Error "Artifact $artifactName not found after download"
+            exit 1
+          }
+
+      - name: Mount File Share and Copy Artifact
+        shell: pwsh
+        env:
+          SHARE_USER: ${{ secrets.SHARE_USER }}         # e.g., domain\username
+          SHARE_PASS: ${{ secrets.SHARE_PASS }}         # Password for the user
+          SHARE_DESTINATION: ${{ secrets.SHARE_DESTINATION }} # UNC path like \\192.168.0.135\Github_destination
+        run: |
+          $artifactName = "${{ github.event.inputs.artifact_name }}"
+          $networkPath = "$env:SHARE_DESTINATION"
+          $user = "$env:SHARE_USER"
+          $pass = "$env:SHARE_PASS"
+
+          Write-Host "Connecting to network share..."
+          net use Z: "$networkPath" /user:$user $pass
+
+          if (!(Test-Path "Z:\")) {
+            Write-Error "Failed to connect to network share at $networkPath"
+            exit 1
+          }
+
+          Write-Host "Copying $artifactName to $networkPath"
+          Copy-Item -Path "$artifactName" -Destination "Z:\" -Force
+
+          Write-Host "Disconnecting network share..."
+          net use Z: /delete
