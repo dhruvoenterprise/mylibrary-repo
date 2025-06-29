@@ -1,21 +1,30 @@
 name: CD using reusable action
 
 on:
+  repository_dispatch:
+    types: [trigger-cd]
+
   workflow_dispatch:
     inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "prod"
       artifact_name:
-        description: 'Artifact file name (e.g., app_package_build14.zip)'
+        description: 'Enter artifact name manually (e.g., app_package_build42_sha.zip)'
         required: true
 
 jobs:
   deploy:
+    if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
     uses: princegupta338/common-cd-actions/.github/workflows/reusable-cd.yml@main
     with:
-      artifact_name: ${{ inputs.artifact_name }}
-      artifactory_path: 'my-repo-local/my-app'         # Adjust per project
+      artifact_name: ${{ github.event.client_payload.artifact_name || inputs.artifact_name }}
+      artifactory_path: 'my-repo-local/my-app'
       share_path: ${{ secrets.SHARE_PATH }}
       share_user: ${{ secrets.SHARE_USER }}
       share_password: ${{ secrets.SHARE_PASSWORD }}
+      environment: ${{ inputs.environment || 'stage' }}
     secrets:
       jfrog_user: ${{ secrets.JFROG_USER }}
       jfrog_password: ${{ secrets.JFROG_PASSWORD }}
