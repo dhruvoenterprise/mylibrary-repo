@@ -1,31 +1,35 @@
-name: CD using reusable action
+name: Download from JFrog and Deploy to Shared Folder
 
 on:
+  workflow_dispatch:
+    inputs:
+      artifact_name:
+        description: 'Artifact file name (e.g., app_package_build14_facd1a8.zip)'
+        required: true
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'stage'
+        type: choice
+        options:
+          - stage
+          - UAT
+          - PROD
+
   repository_dispatch:
     types: [trigger-cd]
 
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        default: "prod"
-      artifact_name:
-        description: 'Enter artifact name manually (e.g., app_package_build42_sha.zip)'
-        required: true
-
 jobs:
   deploy:
-    if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
     uses: princegupta338/common-cd-actions/.github/workflows/reusable-cd.yml@main
     with:
-      artifact_name: ${{ github.event.client_payload.artifact_name || inputs.artifact_name }}
-      artifactory_path: 'my-repo-local/my-app'
+      artifact_name: ${{ github.event.inputs.artifact_name || github.event.client_payload.artifact_name }}
+      artifactory_path: ${{ secrets.ARTIFACTORY_PATH }}
       share_path: ${{ secrets.SHARE_PATH }}
+      environment: ${{ github.event.inputs.environment || github.event.client_payload.environment }}
+    secrets:
+      jfrog_url: ${{ secrets.JFROG_URL }}
+      jfrog_username: ${{ secrets.JFROG_USERNAME }}
+      jfrog_password: ${{ secrets.JFROG_PASSWORD }}
       share_user: ${{ secrets.SHARE_USER }}
       share_password: ${{ secrets.SHARE_PASSWORD }}
-      environment: ${{ inputs.environment || 'stage' }}
-    secrets:
-      jfrog_user: ${{ secrets.JFROG_USER }}
-      jfrog_password: ${{ secrets.JFROG_PASSWORD }}
-      jfrog_url: ${{ secrets.JFROG_URL }}
